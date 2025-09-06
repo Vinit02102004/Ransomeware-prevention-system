@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberGuard AI - Ransomware Prevention System</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <h1>CyberGuard AI</h1>
+            </div>
+            <div class="system-status">
+                <span class="status-badge" id="systemStatus">SECURE</span>
+                <span class="protection-level" id="protectionLevel">HIGH</span>
+                <div class="real-time-protection">
+                    <span id="protectionIndicator"><i class="fas fa-shield-alt"></i></span>
+                    <span id="protectionStatus">INACTIVE</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Sidebar -->
+            <aside class="sidebar">
+                <div class="widget">
+                    <h3><i class="fas fa-database"></i> Backup System</h3>
+                    <div class="backup-controls">
+                        <button class="btn-emergency btn-backup" onclick="viewBackups()">
+                            <i class="fas fa-database"></i> View Backups
+                        </button>
+                        <div class="backup-stats">
+                            <div class="backup-stat">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>Auto Backup: Enabled</span>
+                            </div>
+                            <div class="backup-stat">
+                                <i class="fas fa-folder"></i>
+                                <span>Backup Location: ~/CyberGuardBackups</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="widget">
+                    <h3><i class="fas fa-brain"></i> Capabilities</h3>
+                    <ul>
+                        <li><i class="fas fa-code"></i> Intelligent file pattern analysis</li>
+                        <li><i class="fas fa-cogs"></i> Dynamic easy generation</li>
+                        <li><i class="fas fa-project-diagram"></i> Deviation thread adaptation</li>
+                        <li><i class="fas fa-robot"></i> Behavioral learning algorithms</li>
+                    </ul>
+                </div>
+
+                <div class="widget">
+                    <h3><i class="fas fa-cogs"></i> System Controls</h3>
+                    <div class="control-group">
+                        <label>Protection Level:</label>
+                        <select id="protectionSelect">
+                            <option value="LOW">LOW</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="HIGH" selected>HIGH</option>
+                        </select>
+                    </div>
+                    <button class="btn-update" onclick="updateProtectionLevel()">
+                        <i class="fas fa-sync-alt"></i> Update Protection
+                    </button>
+                </div>
+
+                <div class="widget">
+                    <h3><i class="fas fa-shield-alt"></i> Active Protection</h3>
+                    <div class="emergency-buttons">
+                        <button class="btn-emergency btn-protection" onclick="startRealTimeProtection()">
+                            <i class="fas fa-play"></i> Start Real-time Protection
+                        </button>
+                        <button class="btn-emergency btn-scan" onclick="scanDirectory()">
+                            <i class="fas fa-search"></i> Scan Directory
+                        </button>
+                        <button class="btn-emergency btn-processes" onclick="monitorProcesses()">
+                            <i class="fas fa-tasks"></i> Monitor Processes
+                        </button>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Emergency Controls</h3>
+                    <div class="emergency-buttons">
+                        <button class="btn-emergency btn-lockdown" onclick="emergencyAction('lockdown')">
+                            <i class="fas fa-lock"></i> Lockdown
+                        </button>
+                        <button class="btn-emergency btn-restart" onclick="emergencyAction('restart')">
+                            <i class="fas fa-redo"></i> Restart
+                        </button>
+                        <button class="btn-emergency btn-safemode" onclick="emergencyAction('safe_mode')">
+                            <i class="fas fa-shield-alt"></i> Safe Mode
+                        </button>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h3><i class="fas fa-bolt"></i> Auto Response</h3>
+                    <div class="auto-response">
+                        <div class="response-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Automatically respond to threats</span>
+                        </div>
+                        <div class="response-item">
+                            <i class="fas fa-eye"></i>
+                            <span>Continuous file system scanning</span>
+                        </div>
+                        <div class="response-item">
+                            <i class="fas fa-file-medical-alt"></i>
+                            <span>Honey files automatically deployed</span>
+                        </div>
+                        <div class="response-item">
+                            <i class="fas fa-ban"></i>
+                            <span>Automatic process termination</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Dashboard -->
+            <main class="dashboard">
+                <!-- System Status Cards -->
+                <div class="status-cards">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-shield-virus"></i>
+                            <h3>Live Threat Detection</h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="stat">
+                                <span class="label">Red-line Protection</span>
+                                <span class="value">Active Monitoring</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">File Encryption Detection</span>
+                                <span class="value">Enabled</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-chart-line"></i>
+                            <h3>Security Analytics</h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="stat">
+                                <span class="label">Total Threats</span>
+                                <span class="value" id="totalThreats">202</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Threat Activity</span>
+                                <span class="value" id="threatActivity">241</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Blocked Attacks</span>
+                                <span class="value" id="blockedAttacks">0</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Backed Threats</span>
+                                <span class="value" id="backedThreats">193</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-sync-alt"></i>
+                            <h3>System Scan</h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="stat">
+                                <span class="label">ACTIVE</span>
+                                <span class="value" id="scanCount">1,247,863</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Response Time</span>
+                                <span class="value">0.5ms</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-network-wired"></i>
+                            <h3>Network Status</h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="stat">
+                                <span class="label">WebSocket</span>
+                                <span class="value" id="websocketStatus">Connected</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">API Status</span>
+                                <span class="value">Online</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Threats -->
+                <div class="section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-bug"></i> Recent Threats</h2>
+                        <button class="btn-refresh" onclick="loadRecentThreats()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="threats-list" id="threatsList">
+                        <div class="loading">
+                            <i class="fas fa-spinner fa-spin"></i> Loading threats...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Events -->
+                <div class="section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-history"></i> Security Events</h2>
+                        <button class="btn-refresh" onclick="loadSecurityEvents()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="events-list" id="eventsList">
+                        <div class="loading">
+                            <i class="fas fa-spinner fa-spin"></i> Loading events...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Honey Files -->
+                <div class="section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-file-alt"></i> Honey Files</h2>
+                        <button class="btn-refresh" onclick="loadHoneyFiles()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="honey-files" id="honeyFiles">
+                        <div class="loading">
+                            <i class="fas fa-spinner fa-spin"></i> Loading honey files...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Protection Status -->
+                <div class="section">
+                    <h2><i class="fas fa-shield-alt"></i> Protection Status</h2>
+                    <div class="protection-grid">
+                        <div class="protection-item">
+                            <i class="fas fa-file-contract"></i>
+                            <span>File Monitoring</span>
+                            <span class="status active">Active</span>
+                        </div>
+                        <div class="protection-item">
+                            <i class="fas fa-lock"></i>
+                            <span>Encryption Detection</span>
+                            <span class="status active">Active</span>
+                        </div>
+                        <div class="protection-item">
+                            <i class="fas fa-ban"></i>
+                            <span>Process Blocking</span>
+                            <span class="status active">Active</span>
+                        </div>
+                        <div class="protection-item">
+                            <i class="fas fa-bell"></i>
+                            <span>Real-time Alerts</span>
+                            <span class="status active">Active</span>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar -->
+            <aside class="sidebar-right">
+                <div class="widget">
+                    <h3><i class="fas fa-robot"></i> AI Money File System</h3>
+                    <div class="ai-status">
+                        <div class="ai-item">
+                            <i class="fas fa-tag"></i>
+                            <span>Category: Fine</span>
+                        </div>
+                        <div class="ai-item">
+                            <i class="fas fa-power-off"></i>
+                            <span>AID: ON</span>
+                        </div>
+                        <div class="ai-item">
+                            <i class="fas fa-power-off"></i>
+                            <span>AID: OFF</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h3><i class="fas fa-database"></i> Security Generated</h3>
+                    <div class="security-files">
+                        <div class="file-item">
+                            <i class="fas fa-database"></i>
+                            <span>customer_diskbase.sql</span>
+                        </div>
+                        <div class="file-item">
+                            <i class="fas fa-file-csv"></i>
+                            <span>employee_data.csv</span>
+                        </div>
+                        <div class="file-item">
+                            <i class="fas fa-database"></i>
+                            <span>user_credentials.db</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h3><i class="fas fa-filter"></i> Threat Mitigation</h3>
+                    <div class="mitigation-stats">
+                        <div class="mitigation-item high-blocked">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>HIGH BLOCKED</span>
+                        </div>
+                        <div class="mitigation-item high-mitigated">
+                            <i class="fas fa-check-circle"></i>
+                            <span>HIGH MITIGATED</span>
+                        </div>
+                        <div class="mitigation-item medium-mitigated">
+                            <i class="fas fa-check-circle"></i>
+                            <span>MEDIUM MITIGATED</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h3><i class="fas fa-chart-pie"></i> System Health</h3>
+                    <div class="health-stats">
+                        <div class="health-item">
+                            <span>CPU Usage</span>
+                            <div class="health-bar">
+                                <div class="health-progress" style="width: 45%; background: #00ff88;"></div>
+                            </div>
+                            <span>45%</span>
+                        </div>
+                        <div class="health-item">
+                            <span>Memory Usage</span>
+                            <div class="health-bar">
+                                <div class="health-progress" style="width: 60%; background: #00ccff;"></div>
+                            </div>
+                            <span>60%</span>
+                        </div>
+                        <div class="health-item">
+                            <span>Disk Space</span>
+                            <div class="health-bar">
+                                <div class="health-progress" style="width: 75%; background: #ffa502;"></div>
+                            </div>
+                            <span>75%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h3><i class="fas fa-info-circle"></i> System Info</h3>
+                    <div class="system-info">
+                        <div class="info-item">
+                            <i class="fas fa-server"></i>
+                            <span>Backend: Online</span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-database"></i>
+                            <span>MongoDB: Connected</span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-clock"></i>
+                            <span>Uptime: 2h 45m</span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Last Scan: 2 min ago</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>CyberGuard AI v2.0</span>
+                </div>
+                <div class="footer-section">
+                    <i class="fas fa-bolt"></i>
+                    <span>Real-time Ransomware Protection</span>
+                </div>
+                <div class="footer-section">
+                    <i class="fas fa-circle"></i>
+                    <span id="connectionStatus">Connected to Backend</span>
+                </div>
+                <div class="footer-section">
+                    <i class="fas fa-clock"></i>
+                    <span id="currentTime">Loading...</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Update current time
+        function updateCurrentTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+        }
+
+        setInterval(updateCurrentTime, 1000);
+        updateCurrentTime();
+    </script>
+</body>
+
+</html>
