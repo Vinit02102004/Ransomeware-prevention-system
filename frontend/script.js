@@ -8,6 +8,7 @@ async function init() {
     connectWebSocket();
     startAutoRefresh();
     checkRealTimeProtectionStatus();
+    await getEmailAlertsStatus();
 }
 
 // Load all initial data
@@ -448,19 +449,73 @@ async function deleteBackup(filename) {
     }
 }
 
-async function createManualBackup() {
-    const filePath = prompt('Enter file path to backup:');
-    if (filePath) {
-        try {
-            showNotification('Creating manual backup...', 'info');
-            // Simulate backup creation
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            showNotification('Backup created successfully!', 'success');
-        } catch (error) {
-            console.error('Error creating backup:', error);
-            showNotification('Error creating backup', 'error');
-        }
+// Email alert functions
+async function enableEmailAlerts() {
+    try {
+        const response = await fetch(`${API_BASE}/email-alerts/enable`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+        showNotification(`Email alerts: ${result.status}`, 'success');
+        updateEmailStatusUI(true);
+    } catch (error) {
+        console.error('Error enabling email alerts:', error);
+        showNotification('Error enabling email alerts', 'error');
     }
+}
+
+async function disableEmailAlerts() {
+    try {
+        const response = await fetch(`${API_BASE}/email-alerts/disable`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+        showNotification(`Email alerts: ${result.status}`, 'success');
+        updateEmailStatusUI(false);
+    } catch (error) {
+        console.error('Error disabling email alerts:', error);
+        showNotification('Error disabling email alerts', 'error');
+    }
+}
+
+async function getEmailAlertsStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/email-alerts/status`);
+        const result = await response.json();
+        updateEmailStatusUI(result.enabled);
+        return result.enabled;
+    } catch (error) {
+        console.error('Error getting email status:', error);
+        return false;
+    }
+}
+
+async function sendTestEmail() {
+    try {
+        showNotification('Sending test email...', 'info');
+        const response = await fetch(`${API_BASE}/email-alerts/test`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+        showNotification('Test email sent! Check your inbox.', 'success');
+    } catch (error) {
+        console.error('Error sending test email:', error);
+        showNotification('Error sending test email', 'error');
+    }
+}
+
+function updateEmailStatusUI(isEnabled) {
+    const emailStatus = document.getElementById('emailStatus');
+    const enableBtn = document.querySelector('.btn-enable-email');
+    const disableBtn = document.querySelector('.btn-disable-email');
+    
+    if (emailStatus) {
+        emailStatus.textContent = isEnabled ? 'ENABLED' : 'DISABLED';
+        emailStatus.className = isEnabled ? 'email-status-enabled' : 'email-status-disabled';
+    }
+    
+    if (enableBtn) enableBtn.style.display = isEnabled ? 'none' : 'block';
+    if (disableBtn) disableBtn.style.display = isEnabled ? 'block' : 'none';
 }
 
 // Display functions
@@ -469,10 +524,8 @@ function updateSystemStatus(data) {
     document.getElementById('protectionLevel').textContent = data.protection_level;
     document.getElementById('scanCount').textContent = data.scan_count.toLocaleString();
     
-    // Update select box
     document.getElementById('protectionSelect').value = data.protection_level;
     
-    // Update real-time protection status
     isRealTimeProtectionActive = data.real_time_protection || false;
     updateProtectionUI();
 }
@@ -568,14 +621,11 @@ function addNewThreat(threat) {
     
     container.insertBefore(newThreat, container.firstChild);
     
-    // Remove oldest threat if too many
     if (container.children.length > 10) {
         container.removeChild(container.lastChild);
     }
     
-    // Flash animation
     setTimeout(() => newThreat.classList.remove('new-threat'), 2000);
-    
     showNotification(`New threat detected: ${threat.type}`, 'warning');
 }
 
@@ -598,15 +648,12 @@ function addNewEvent(event) {
     
     container.insertBefore(newEvent, container.firstChild);
     
-    // Remove oldest event if too many
     if (container.children.length > 20) {
         container.removeChild(container.lastChild);
     }
     
-    // Flash animation
     setTimeout(() => newEvent.classList.remove('new-event'), 2000);
     
-    // Show special notification for backup events
     if (event.event.includes('Backup')) {
         showNotification(event.event, 'success');
     }
@@ -614,7 +661,6 @@ function addNewEvent(event) {
 
 // Notification system
 function showNotification(message, type = 'info') {
-    // Create notification element
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `
@@ -625,7 +671,6 @@ function showNotification(message, type = 'info') {
     
     document.body.appendChild(notification);
     
-    // Remove after 5 seconds
     setTimeout(() => {
         if (notification.parentElement) {
             notification.style.animation = 'slideOut 0.3s ease';
@@ -646,7 +691,6 @@ function getNotificationIcon(type) {
 
 // Auto refresh
 function startAutoRefresh() {
-    // Refresh data every 30 seconds
     setInterval(loadAllData, 30000);
 }
 
