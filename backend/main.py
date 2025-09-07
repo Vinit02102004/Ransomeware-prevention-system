@@ -7,7 +7,10 @@ import os
 import psutil
 import math
 import json
-import shutil
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import ssl
 from typing import List, Dict
 from bson import ObjectId
 from pathlib import Path
@@ -35,129 +38,142 @@ app.add_middleware(
 # WebSocket connections
 active_connections: List[WebSocket] = []
 
+# Email configuration
+class EmailConfig:
+    SMTP_SERVER = "smtp.gmail.com"
+    SMTP_PORT = 587
+    SENDER_EMAIL = "vinitgandhi15@gmail.com"
+    SENDER_PASSWORD = "bvrc gicr feyz mpms"
+    RECEIVER_EMAIL = "vinitgandhi15@gmail.com"
+    ENABLED = True
 
-# Backup function add karo
-async def create_backup(file_path):
-    """Create backup of file before it gets encrypted"""
-    try:
-        if os.path.exists(file_path):
-            # Backup folder banayo
-            backup_dir = Path.home() / "CyberGuardBackups"
-            backup_dir.mkdir(exist_ok=True)
+# Email service
+class EmailService:
+    @staticmethod
+    async def send_email_alert(threat_data: dict, event_type: str = "THREAT"):
+        if not EmailConfig.ENABLED:
+            return False
             
-            # Backup file ka naam
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = Path(file_path).name
-            backup_path = backup_dir / f"{filename}_{timestamp}.bak"
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = EmailConfig.SENDER_EMAIL
+            msg['To'] = EmailConfig.RECEIVER_EMAIL
             
-            # File copy karo backup mein
-            shutil.copy2(file_path, backup_path)
-            
-            # Log event
-            event = {
-                "event": f"Backup created: {filename}",
-                "source": "BACKUP_SYSTEM",
-                "timestamp": datetime.now().isoformat(),
-                "severity": "INFO",
-                "backup_path": str(backup_path)
-            }
-            await mongodb.database.security_events.insert_one(event)
-            await broadcast_update(event, "security_event")
-            
+            if event_type == "THREAT":
+                msg['Subject'] = f"🚨 Ransomware Threat Detected - {threat_data.get('type', 'Unknown')}"
+                body = f"""
+⚠️ CYBERGUARD ALERT - RANSOMWARE THREAT DETECTED ⚠️
+
+🔍 Threat Details:
+• Type: {threat_data.get('type', 'Unknown')}
+• Source IP: {threat_data.get('ip', 'Unknown')}
+• Timestamp: {threat_data.get('timestamp', 'Unknown')}
+• Severity: {threat_data.get('severity', 'MEDIUM')}
+
+🛡️ System Response:
+• Protection Level: {threat_data.get('protection_level', 'HIGH')}
+• Status: {threat_data.get('status', 'SECURE')}
+• Blocked: {threat_data.get('blocked', 'Yes')}
+
+📊 Additional Info:
+• Total Threats: {threat_data.get('total_threats', 0)}
+• Blocked Attacks: {threat_data.get('blocked_attacks', 0)}
+
+🔗 Dashboard: http://localhost:8080
+
+Stay vigilant!
+CyberGuard AI System
+"""
+            else:
+                msg['Subject'] = f"🔔 Security Event - {threat_data.get('event', 'Unknown')}"
+                body = f"""
+📋 SECURITY EVENT NOTIFICATION
+
+🔍 Event Details:
+• Event: {threat_data.get('event', 'Unknown')}
+• Source: {threat_data.get('source', 'Unknown')}
+• Timestamp: {threat_data.get('timestamp', 'Unknown')}
+• Severity: {threat_data.get('severity', 'INFO')}
+
+📊 System Status:
+• Protection Level: {threat_data.get('protection_level', 'HIGH')}
+• Status: {threat_data.get('status', 'SECURE')}
+
+🔗 Dashboard: http://localhost:8080
+
+CyberGuard AI Monitoring
+"""
+
+            msg.attach(MIMEText(body, 'plain'))
+            context = ssl.create_default_context()
+
+            with smtplib.SMTP(EmailConfig.SMTP_SERVER, EmailConfig.SMTP_PORT) as server:
+                server.starttls(context=context)
+                server.login(EmailConfig.SENDER_EMAIL, EmailConfig.SENDER_PASSWORD)
+                server.send_message(msg)
+
+            print(f"✅ Email alert sent for {event_type}")
             return True
-    except Exception as e:
-        print(f"Backup error: {e}")
-    return False
 
-
-
+        except Exception as e:
+            print(f"❌ Email sending failed: {e}")
+            return False
 
 # Ransomware detector
 class RansomwareDetector(FileSystemEventHandler):
-
-    def on_modified(self, event):
-        if not event.is_directory:
-            # Pehle backup banao, fir check karo
-            asyncio.create_task(self.handle_file_event(event.src_path))
-    
-    async def handle_file_event(self, file_path):
-        """Handle file modification with backup"""
-        # Pehle backup lo
-        backup_created = await create_backup(file_path)
-        
-        # Fir encryption check karo
-        self.check_file_encryption(file_path)
-        
-        if backup_created:
-            print(f"✅ Backup created for: {file_path}")
-
-
-
     def __init__(self):
         self.suspicious_processes = set()
-        self.file_hashes = {}
         self.protected_directories = ["/Documents", "/Desktop", "/Downloads", "/Pictures"]
         self.observer = None
         
     def on_modified(self, event):
         if not event.is_directory:
-            self.check_file_encryption(event.src_path)
-            
-    def on_created(self, event):
-        if not event.is_directory:
-            self.analyze_new_file(event.src_path)
+            asyncio.create_task(self.handle_file_event(event.src_path))
     
+    async def handle_file_event(self, file_path):
+        backup_created = await create_backup(file_path)
+        self.check_file_encryption(file_path)
+        
     def check_file_encryption(self, file_path):
-        """Detect potential encryption by checking file entropy"""
         try:
             if os.path.exists(file_path) and os.path.isfile(file_path):
-                # Skip system files and temporary files
                 if any(x in file_path for x in ['.tmp', '.temp', '~$']):
                     return
                     
                 with open(file_path, 'rb') as f:
                     data = f.read()
-                    if len(data) > 1024:  # Only check files with reasonable size
+                    if len(data) > 1024:
                         entropy = self.calculate_entropy(data)
-                        
-                        if entropy > 7.8:  # High entropy indicates encryption
+                        if entropy > 7.8:
                             asyncio.create_task(self.block_ransomware(file_path))
                             
         except Exception as e:
             print(f"Error checking file {file_path}: {e}")
     
     def calculate_entropy(self, data):
-        """Calculate Shannon entropy of data"""
         if not data:
             return 0
-            
         entropy = 0
         for x in range(256):
             p_x = float(data.count(x)) / len(data)
             if p_x > 0:
                 entropy += - p_x * math.log(p_x, 2)
-                
         return entropy
     
     async def block_ransomware(self, file_path):
-        """Block ransomware process and take action"""
         try:
-            # Find process accessing the file
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'open_files']):
+            for proc in psutil.process_iter(['pid', 'name', 'open_files']):
                 try:
                     if any(file_path in str(f.path) for f in proc.info['open_files'] or []):
-                        # Terminate the suspicious process
                         proc.terminate()
                         await self.log_ransomware_block(proc.info['name'], file_path, proc.info['pid'])
                         break
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
-                    
         except Exception as e:
             print(f"Error blocking ransomware: {e}")
     
     async def log_ransomware_block(self, process_name, file_path, pid):
-        """Log ransomware blocking event"""
         event = {
             "event": f"Ransomware blocked: {process_name} (PID: {pid})",
             "source": "SYSTEM",
@@ -167,11 +183,9 @@ class RansomwareDetector(FileSystemEventHandler):
             "action": "process_terminated"
         }
         
-        # Add to database and broadcast
         await mongodb.database.security_events.insert_one(event)
         await broadcast_update(event, "security_event")
         
-        # Also add as a threat
         threat = {
             "type": "Ransomware Blocked",
             "ip": "127.0.0.1",
@@ -181,9 +195,19 @@ class RansomwareDetector(FileSystemEventHandler):
         }
         await mongodb.database.threats.insert_one(threat)
         await broadcast_update(threat, "threat_detected")
+        
+        # Send email alert
+        email_data = {
+            "event": f"Ransomware blocked: {process_name}",
+            "source": "SYSTEM",
+            "timestamp": datetime.now().isoformat(),
+            "severity": "CRITICAL",
+            "protection_level": "HIGH",
+            "status": "SECURE"
+        }
+        await EmailService.send_email_alert(email_data, "EVENT")
 
     def start_monitoring(self):
-        """Start file system monitoring"""
         if self.observer and self.observer.is_alive():
             return False
             
@@ -202,7 +226,6 @@ class RansomwareDetector(FileSystemEventHandler):
         return False
         
     def stop_monitoring(self):
-        """Stop file system monitoring"""
         if self.observer:
             self.observer.stop()
             self.observer.join()
@@ -216,9 +239,7 @@ ransomware_detector = RansomwareDetector()
 @app.on_event("startup")
 async def startup_event():
     await connect_to_mongo()
-    # Initialize with default data if collections are empty
     await initialize_default_data()
-    # Start background tasks
     asyncio.create_task(simulate_threat_detection())
     asyncio.create_task(simulate_system_scan())
 
@@ -227,20 +248,18 @@ async def shutdown_event():
     ransomware_detector.stop_monitoring()
     await close_mongo_connection()
 
-# WebSocket endpoint for real-time updates
+# WebSocket endpoint
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     active_connections.append(websocket)
     try:
         while True:
-            # Keep connection alive
             await websocket.receive_text()
     except WebSocketDisconnect:
         active_connections.remove(websocket)
 
 async def broadcast_update(data: Dict, update_type: str):
-    # Convert datetime objects to strings for JSON serialization
     def datetime_converter(o):
         if isinstance(o, datetime):
             return o.isoformat()
@@ -257,8 +276,35 @@ async def broadcast_update(data: Dict, update_type: str):
     except Exception as e:
         print(f"Error serializing message: {e}")
 
+# Backup function
+async def create_backup(file_path):
+    try:
+        if os.path.exists(file_path):
+            backup_dir = Path.home() / "CyberGuardBackups"
+            backup_dir.mkdir(exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = Path(file_path).name
+            backup_path = backup_dir / f"{filename}_{timestamp}.bak"
+            
+            shutil.copy2(file_path, backup_path)
+            
+            event = {
+                "event": f"Backup created: {filename}",
+                "source": "BACKUP_SYSTEM",
+                "timestamp": datetime.now().isoformat(),
+                "severity": "INFO",
+                "backup_path": str(backup_path)
+            }
+            await mongodb.database.security_events.insert_one(event)
+            await broadcast_update(event, "security_event")
+            
+            return True
+    except Exception as e:
+        print(f"Backup error: {e}")
+    return False
+
 async def initialize_default_data():
-    # Initialize system status
     status_count = await mongodb.database.system_status.count_documents({})
     if status_count == 0:
         default_status = {
@@ -269,7 +315,6 @@ async def initialize_default_data():
         }
         await mongodb.database.system_status.insert_one(default_status)
     
-    # Initialize security analytics
     analytics_count = await mongodb.database.security_analytics.count_documents({})
     if analytics_count == 0:
         default_analytics = {
@@ -281,7 +326,6 @@ async def initialize_default_data():
         }
         await mongodb.database.security_analytics.insert_one(default_analytics)
     
-    # Initialize honey files
     honey_files_count = await mongodb.database.honey_files.count_documents({})
     if honey_files_count == 0:
         current_time = datetime.now()
@@ -302,7 +346,6 @@ async def root():
 async def get_system_status():
     status = await mongodb.database.system_status.find_one()
     if status:
-        # Remove _id field for clean response
         status_data = {k: v for k, v in status.items() if k != '_id'}
         return status_data
     raise HTTPException(status_code=404, detail="System status not found")
@@ -310,7 +353,6 @@ async def get_system_status():
 @app.get("/api/recent-threats", response_model=List[Threat])
 async def get_recent_threats(limit: int = 10):
     threats = await mongodb.database.threats.find().sort("timestamp", -1).limit(limit).to_list(limit)
-    # Remove _id field for clean response
     for threat in threats:
         threat.pop('_id', None)
     return threats
@@ -318,7 +360,6 @@ async def get_recent_threats(limit: int = 10):
 @app.get("/api/security-events", response_model=List[SecurityEvent])
 async def get_security_events(limit: int = 20):
     events = await mongodb.database.security_events.find().sort("timestamp", -1).limit(limit).to_list(limit)
-    # Remove _id field for clean response
     for event in events:
         event.pop('_id', None)
     return events
@@ -327,7 +368,6 @@ async def get_security_events(limit: int = 20):
 async def get_security_analytics():
     analytics = await mongodb.database.security_analytics.find_one()
     if analytics:
-        # Remove _id field for clean response
         analytics_data = {k: v for k, v in analytics.items() if k != '_id'}
         return analytics_data
     raise HTTPException(status_code=404, detail="Security analytics not found")
@@ -335,7 +375,6 @@ async def get_security_analytics():
 @app.get("/api/honey-files", response_model=List[HoneyFile])
 async def get_honey_files():
     files = await mongodb.database.honey_files.find().sort("timestamp", -1).to_list(100)
-    # Remove _id field for clean response
     for file in files:
         file.pop('_id', None)
     return files
@@ -345,12 +384,8 @@ async def update_protection_level(update: ProtectionLevelUpdate):
     if update.level not in ["LOW", "MEDIUM", "HIGH"]:
         raise HTTPException(status_code=400, detail="Invalid protection level")
     
-    await mongodb.database.system_status.update_one(
-        {}, 
-        {"$set": {"protection_level": update.level}}
-    )
+    await mongodb.database.system_status.update_one({}, {"$set": {"protection_level": update.level}})
     
-    # Broadcast update
     status = await mongodb.database.system_status.find_one()
     if status:
         status_data = {k: v for k, v in status.items() if k != '_id'}
@@ -363,15 +398,9 @@ async def emergency_action(action: EmergencyAction):
     if action.action not in ["lockdown", "restart", "safe_mode"]:
         raise HTTPException(status_code=400, detail="Invalid emergency action")
     
-    # Update system status based on action
     new_status = "LOCKDOWN" if action.action == "lockdown" else "SECURE"
+    await mongodb.database.system_status.update_one({}, {"$set": {"status": new_status}})
     
-    await mongodb.database.system_status.update_one(
-        {}, 
-        {"$set": {"status": new_status}}
-    )
-    
-    # Create security event
     event = {
         "event": f"Emergency {action.action} activated",
         "source": "SYSTEM",
@@ -380,28 +409,34 @@ async def emergency_action(action: EmergencyAction):
     }
     await mongodb.database.security_events.insert_one(event)
     
-    # Broadcast updates
     status = await mongodb.database.system_status.find_one()
     if status:
         status_data = {k: v for k, v in status.items() if k != '_id'}
         await broadcast_update(status_data, "system_status_update")
     
-    event.pop('_id', None)  # Remove _id before broadcasting
+    event.pop('_id', None)
     await broadcast_update(event, "security_event")
+    
+    # Send email alert for emergency action
+    email_data = {
+        "event": f"Emergency {action.action} activated",
+        "source": "SYSTEM",
+        "timestamp": datetime.now().isoformat(),
+        "severity": "HIGH",
+        "protection_level": "HIGH",
+        "status": new_status
+    }
+    await EmailService.send_email_alert(email_data, "EVENT")
     
     return {"message": f"Emergency action {action.action} executed"}
 
-# New ransomware protection endpoints
+# Ransomware protection endpoints
 @app.post("/api/start-protection")
 async def start_protection():
-    """Start real-time file monitoring"""
     try:
         success = ransomware_detector.start_monitoring()
         if success:
-            await mongodb.database.system_status.update_one(
-                {}, 
-                {"$set": {"real_time_protection": True}}
-            )
+            await mongodb.database.system_status.update_one({}, {"$set": {"real_time_protection": True}})
             
             event = {
                 "event": "Real-time protection started",
@@ -420,14 +455,10 @@ async def start_protection():
 
 @app.post("/api/stop-protection")
 async def stop_protection():
-    """Stop real-time file monitoring"""
     try:
         success = ransomware_detector.stop_monitoring()
         if success:
-            await mongodb.database.system_status.update_one(
-                {}, 
-                {"$set": {"real_time_protection": False}}
-            )
+            await mongodb.database.system_status.update_one({}, {"$set": {"real_time_protection": False}})
             
             event = {
                 "event": "Real-time protection stopped",
@@ -446,7 +477,6 @@ async def stop_protection():
 
 @app.post("/api/scan-directory")
 async def scan_directory(path: str = "/Documents"):
-    """Scan directory for potential ransomware"""
     try:
         full_path = str(Path.home() / path[1:]) if path.startswith("/") else path
         
@@ -457,13 +487,12 @@ async def scan_directory(path: str = "/Documents"):
         scanned_files = 0
         
         for root, _, files in os.walk(full_path):
-            for file in files[:100]:  # Limit to first 100 files per directory
+            for file in files[:100]:
                 file_path = os.path.join(root, file)
                 try:
                     with open(file_path, 'rb') as f:
-                        data = f.read(4096)  # Read first 4KB for efficiency
+                        data = f.read(4096)
                         entropy = ransomware_detector.calculate_entropy(data)
-                        
                         if entropy > 7.8:
                             results.append({
                                 "file": file_path,
@@ -474,17 +503,12 @@ async def scan_directory(path: str = "/Documents"):
                 except Exception:
                     continue
         
-        return {
-            "scan_results": results, 
-            "scanned_files": scanned_files,
-            "suspicious_files": len(results)
-        }
+        return {"scan_results": results, "scanned_files": scanned_files, "suspicious_files": len(results)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/running-processes")
 async def get_running_processes():
-    """Get list of running processes for monitoring"""
     try:
         processes = []
         for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_percent', 'cmdline']):
@@ -492,14 +516,12 @@ async def get_running_processes():
                 processes.append(proc.info)
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
-        
-        return {"processes": processes[:50]}  # Return first 50
+        return {"processes": processes[:50]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/block-process/{pid}")
 async def block_process(pid: int):
-    """Block/terminate suspicious process"""
     try:
         process = psutil.Process(pid)
         process_name = process.name()
@@ -515,109 +537,15 @@ async def block_process(pid: int):
         await mongodb.database.security_events.insert_one(event)
         await broadcast_update(event, "security_event")
         
-        # Update blocked attacks count
-        await mongodb.database.security_analytics.update_one(
-            {}, 
-            {"$inc": {"blocked_attacks": 1}}
-        )
+        await mongodb.database.security_analytics.update_one({}, {"$inc": {"blocked_attacks": 1}})
         
         return {"message": f"Process {process_name} (PID: {pid}) terminated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Background task to simulate threat detection
-async def simulate_threat_detection():
-    threat_types = ["Data Extracted", "File Encryption", "Data Extractor", "Ransomware Attempt"]
-    ip_ranges = ["10.0.0.", "192.168.1.", "172.16.0."]
-    
-    while True:
-        # Wait for a random interval between 5-15 seconds
-        await asyncio.sleep(random.randint(5, 15))
-        
-        # Generate a random threat
-        threat_type = random.choice(threat_types)
-        ip_range = random.choice(ip_ranges)
-        ip = ip_range + str(random.randint(1, 255))
-        timestamp = datetime.now()
-        
-        threat = {
-            "type": threat_type,
-            "ip": ip,
-            "timestamp": timestamp
-        }
-        
-        # Insert into database
-        await mongodb.database.threats.insert_one(threat)
-        
-        # Create security event
-        severities = ["LOW", "MEDIUM", "HIGH"]
-        severity = random.choice(severities)
-        
-        event = {
-            "event": f"{threat_type} attempt detected",
-            "source": ip,
-            "timestamp": timestamp,
-            "severity": severity
-        }
-        await mongodb.database.security_events.insert_one(event)
-        
-        # Update analytics
-        analytics = await mongodb.database.security_analytics.find_one()
-        if analytics:
-            new_total = analytics["total_threats"] + 1
-            new_activity = analytics["threat_activity"] + random.randint(1, 5)
-            
-            await mongodb.database.security_analytics.update_one(
-                {"_id": analytics["_id"]}, 
-                {"$set": {
-                    "total_threats": new_total,
-                    "threat_activity": new_activity
-                }}
-            )
-            
-            # Broadcast updates
-            updated_analytics = await mongodb.database.security_analytics.find_one()
-            if updated_analytics:
-                updated_analytics_data = {k: v for k, v in updated_analytics.items() if k != '_id'}
-                await broadcast_update(updated_analytics_data, "analytics_update")
-        
-        # Prepare threat and event for broadcasting (remove _id)
-        threat.pop('_id', None)
-        event.pop('_id', None)
-        
-        await broadcast_update(threat, "threat_detected")
-        await broadcast_update(event, "security_event")
-
-# Background task to simulate system scan updates
-async def simulate_system_scan():
-    while True:
-        # Wait for 30 seconds
-        await asyncio.sleep(30)
-        
-        # Update scan count
-        status = await mongodb.database.system_status.find_one()
-        if status:
-            new_count = status["scan_count"] + random.randint(50, 100)
-            
-            await mongodb.database.system_status.update_one(
-                {"_id": status["_id"]}, 
-                {"$set": {"scan_count": new_count}}
-            )
-            
-            # Broadcast update
-            updated_status = await mongodb.database.system_status.find_one()
-            if updated_status:
-                updated_status_data = {k: v for k, v in updated_status.items() if k != '_id'}
-                await broadcast_update(updated_status_data, "system_status_update")
-
-
-
-
-
-# New API endpoint for backups
+# Backup endpoints
 @app.get("/api/backups")
 async def get_backups():
-    """Get list of all backups"""
     try:
         backup_dir = Path.home() / "CyberGuardBackups"
         backups = []
@@ -630,14 +558,12 @@ async def get_backups():
                     "created": file.stat().st_ctime,
                     "path": str(file)
                 })
-        
         return {"backups": sorted(backups, key=lambda x: x["created"], reverse=True)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/backup/{filename}")
 async def delete_backup(filename: str):
-    """Delete a backup file"""
     try:
         backup_dir = Path.home() / "CyberGuardBackups"
         file_path = backup_dir / filename
@@ -649,6 +575,119 @@ async def delete_backup(filename: str):
             raise HTTPException(status_code=404, detail="Backup not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Email alert endpoints
+@app.post("/api/email-alerts/enable")
+async def enable_email_alerts():
+    EmailConfig.ENABLED = True
+    return {"message": "Email alerts enabled", "status": "enabled"}
+
+@app.post("/api/email-alerts/disable")
+async def disable_email_alerts():
+    EmailConfig.ENABLED = False
+    return {"message": "Email alerts disabled", "status": "disabled"}
+
+@app.get("/api/email-alerts/status")
+async def get_email_alerts_status():
+    return {"enabled": EmailConfig.ENABLED}
+
+@app.post("/api/email-alerts/test")
+async def send_test_email():
+    test_data = {
+        "type": "Test Threat",
+        "ip": "192.168.1.100",
+        "timestamp": datetime.now().isoformat(),
+        "severity": "TEST",
+        "protection_level": "HIGH",
+        "status": "SECURE",
+        "blocked": "Yes",
+        "total_threats": 999,
+        "blocked_attacks": 999
+    }
+    success = await EmailService.send_email_alert(test_data, "THREAT")
+    if success:
+        return {"message": "Test email sent successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send test email")
+
+# Background tasks
+async def simulate_threat_detection():
+    threat_types = ["Data Extracted", "File Encryption", "Data Extractor", "Ransomware Attempt"]
+    ip_ranges = ["10.0.0.", "192.168.1.", "172.16.0."]
+    
+    while True:
+        await asyncio.sleep(random.randint(5, 15))
+        
+        threat_type = random.choice(threat_types)
+        ip_range = random.choice(ip_ranges)
+        ip = ip_range + str(random.randint(1, 255))
+        timestamp = datetime.now()
+        
+        threat = {"type": threat_type, "ip": ip, "timestamp": timestamp}
+        await mongodb.database.threats.insert_one(threat)
+        
+        severities = ["LOW", "MEDIUM", "HIGH"]
+        severity = random.choice(severities)
+        
+        event = {
+            "event": f"{threat_type} attempt detected",
+            "source": ip,
+            "timestamp": timestamp,
+            "severity": severity
+        }
+        await mongodb.database.security_events.insert_one(event)
+        
+        analytics = await mongodb.database.security_analytics.find_one()
+        if analytics:
+            new_total = analytics["total_threats"] + 1
+            new_activity = analytics["threat_activity"] + random.randint(1, 5)
+            
+            await mongodb.database.security_analytics.update_one(
+                {"_id": analytics["_id"]}, 
+                {"$set": {"total_threats": new_total, "threat_activity": new_activity}}
+            )
+            
+            updated_analytics = await mongodb.database.security_analytics.find_one()
+            if updated_analytics:
+                updated_analytics_data = {k: v for k, v in updated_analytics.items() if k != '_id'}
+                await broadcast_update(updated_analytics_data, "analytics_update")
+        
+        # Send email alert for threat
+        email_data = {
+            "type": threat_type,
+            "ip": ip,
+            "timestamp": timestamp.isoformat(),
+            "severity": severity,
+            "protection_level": "HIGH",
+            "status": "SECURE",
+            "blocked": "Yes",
+            "total_threats": new_total,
+            "blocked_attacks": analytics.get("blocked_attacks", 0) if analytics else 0
+        }
+        await EmailService.send_email_alert(email_data, "THREAT")
+        
+        threat.pop('_id', None)
+        event.pop('_id', None)
+        
+        await broadcast_update(threat, "threat_detected")
+        await broadcast_update(event, "security_event")
+
+async def simulate_system_scan():
+    while True:
+        await asyncio.sleep(30)
+        
+        status = await mongodb.database.system_status.find_one()
+        if status:
+            new_count = status["scan_count"] + random.randint(50, 100)
+            await mongodb.database.system_status.update_one(
+                {"_id": status["_id"]}, 
+                {"$set": {"scan_count": new_count}}
+            )
+            
+            updated_status = await mongodb.database.system_status.find_one()
+            if updated_status:
+                updated_status_data = {k: v for k, v in updated_status.items() if k != '_id'}
+                await broadcast_update(updated_status_data, "system_status_update")
 
 if __name__ == "__main__":
     import uvicorn
