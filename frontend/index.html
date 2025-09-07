@@ -32,6 +32,30 @@
             <!-- Left Sidebar -->
             <aside class="sidebar">
                 <div class="widget">
+                    <h3><i class="fas fa-envelope"></i> Email Alerts</h3>
+                    <div class="email-controls">
+                        <div class="email-status">
+                            <span>Status: </span>
+                            <span id="emailStatus" class="email-status-disabled">DISABLED</span>
+                        </div>
+                        <div class="email-buttons">
+                            <button class="btn-email btn-enable-email" onclick="enableEmailAlerts()">
+                                <i class="fas fa-bell"></i> Enable Alerts
+                            </button>
+                            <button class="btn-email btn-disable-email" onclick="disableEmailAlerts()" style="display: none;">
+                                <i class="fas fa-bell-slash"></i> Disable Alerts
+                            </button>
+                            <button class="btn-email btn-test-email" onclick="sendTestEmail()">
+                                <i class="fas fa-paper-plane"></i> Test Email
+                            </button>
+                        </div>
+                        <div class="email-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Alerts sent to: vinitgandhi15@gmail.com</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="widget">
                     <h3><i class="fas fa-database"></i> Backup System</h3>
                     <div class="backup-controls">
                         <button class="btn-emergency btn-backup" onclick="viewBackups()">
